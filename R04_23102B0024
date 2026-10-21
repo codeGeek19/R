@@ -1,0 +1,220 @@
+# =========================
+# 1. Install packages
+# =========================
+
+install.packages("BiocManager")
+BiocManager::install("EBImage")
+
+install.packages("keras3")
+
+# =========================
+# 2. Load Packages
+# =========================
+
+library(EBImage)
+library(keras3)
+
+
+# =========================
+# 3. Read Images
+# =========================
+
+setwd("C:/Users/Sanika/Downloads/images")
+
+pics <- c(
+  "p1.jpg", "p2.jpg", "p3.jpg",
+  "p4.jpg", "p5.jpg", "p6.jpg",
+  "c1.jpg", "c2.jpg", "c3.jpg",
+  "c4.jpg", "c5.jpg", "c6.jpg"
+)
+
+mypic <- list()
+
+for (i in 1:12) {
+  mypic[[i]] <- readImage(pics[i])
+}
+
+
+# =========================
+# 4. Explore Images
+# =========================
+
+print(mypic[[1]])
+
+display(mypic[[8]])
+
+summary(mypic[[1]])
+
+hist(mypic[[2]])
+
+str(mypic)
+
+
+# =========================
+# 5. Resize Images
+# =========================
+
+for (i in 1:12) {
+  mypic[[i]] <- resize(mypic[[i]], 64, 64)
+}
+
+
+# =========================
+# 6. Reshape Images
+# =========================
+
+for (i in 1:12) {
+  mypic[[i]] <- array_reshape(
+    mypic[[i]],
+    c(64, 64, 3)
+  )
+}
+
+
+# =========================
+# 7. Create Training Data
+# =========================
+# p1-p5 = class 0
+# c1-c5 = class 1
+
+trainx <- NULL
+
+for (i in c(1:5, 7:11)) {
+  trainx <- rbind(trainx, mypic[[i]])
+}
+
+str(trainx)
+
+
+# =========================
+# 8. Create Test Data
+# =========================
+# p6 = class 0
+# c6 = class 1
+
+testx <- rbind(
+  mypic[[6]],
+  mypic[[12]]
+)
+
+
+# =========================
+# 9. Create Labels
+# =========================
+
+trainy <- c(
+  0, 0, 0, 0, 0,
+  1, 1, 1, 1, 1
+)
+
+testy <- c(0, 1)
+
+
+# Check dimensions
+
+dim(trainx)
+dim(testx)
+
+length(trainy)
+length(testy)
+
+
+# =========================
+# 10. One-Hot Encoding
+# =========================
+
+trainLabels <- to_categorical(
+  trainy,
+  num_classes = 2
+)
+
+testLabels <- to_categorical(
+  testy,
+  num_classes = 2
+)
+
+
+# =========================
+# 11. Build Model
+# =========================
+
+model <- keras_model_sequential()
+
+model |>
+  layer_dense(
+    units = 256,
+    activation = "relu",
+    input_shape = c(64 * 64 * 3)
+  ) |>
+  layer_dense(
+    units = 128,
+    activation = "relu"
+  ) |>
+  layer_dense(
+    units = 2,
+    activation = "softmax"
+  )
+
+
+# =========================
+# 12. View Model
+# =========================
+
+summary(model)
+
+# Compile
+model %>%
+  compile(
+    loss = "categorical_crossentropy",
+    optimizer = optimizer_rmsprop(),
+    metrics = c("accuracy")
+  )
+
+# Fit Model
+history <- model %>%
+  fit(
+    trainx,
+    trainLabels,
+    epochs = 30,
+    batch_size = 32,
+    validation_split = 0.2
+  )
+
+# Evaluation & Prediction - train data
+
+model %>% evaluate(trainx, trainLabels)
+
+# Predict probabilities
+prob <- model %>% predict(trainx)
+
+# Convert probabilities to class
+pred <- max.col(prob) - 1
+
+# Confusion table
+table(
+  Predicted = pred,
+  Actual = trainy
+)
+
+model %>% evaluate(testx, testLabels)
+test_prob <- model %>% predict(testx)
+
+test_pred <- max.col(test_prob) - 1
+
+table(
+  Predicted = test_pred,
+  Actual = testy
+)
+
+# Show probabilities and predictions
+cbind(
+  prob,
+  Predicted = pred,
+  Actual = trainy
+)
+
+cbind(
+  test_prob,
+  Predicted = test_pred,
+  Actual = testy
+)
